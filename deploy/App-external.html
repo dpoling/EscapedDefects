@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EscapedDefects</title>
+
+    <script type="text/javascript" src="https://rally1.rallydev.com/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",config:{defaultSettings:{myQuery:"",model:"Defect"}},launch:function(){var model=this.getSetting("model"),promises=[this.fetchIterations(),this.fetchDefects(model)];this.setLoading("Loading historical and current data to compare..."),Deft.Promise.all(promises).then({success:this.processData,failure:this.showErrorNotification,scope:this}).always(function(){this.setLoading(!1)},this)},fetchIterations:function(){var deferred=Ext.create("Deft.Deferred"),thisApp=this,store=Ext.create("Rally.data.wsapi.Store",{model:"Iteration",fetch:["Name","ObjectID","Project","StartDate","EndDate"],filters:[],pageSize:2e3,limit:1/0});return store.load({callback:function(records,operation){if(operation.wasSuccessful())thisApp.iterations=_.uniq(records,function(rec){return thisApp.getIterationName(rec)}),thisApp.iterations=_.sortBy(thisApp.iterations,function(i){return new Date(Date.parse(i.get("EndDate")))}),thisApp.iterations=thisApp.iterations.reverse(),deferred.resolve(records);else{var errorMsg="Faled to load Iterations"+operation.error&&operation.error.errors.join(",br/>");deferred.reject(errorMsg)}}}),store},fetchDefects:function(model){var deferred=Ext.create("Deft.Deferred"),store=Ext.create("Rally.data.wsapi.Store",{model:model,fetch:["FormattedID","Name","State","CreationDate","OpenedDate","ClosedDate"],filters:this.getFilters(),pageSize:2e3,limit:"Infinity"});return store.load({callback:function(records,operation){if(operation.wasSuccessful())deferred.resolve(records);else{var errorMsg="Failed to load Defect records: "+operation.error&&operation.error.errors.join("<br/>");deferred.reject(errorMsg)}}}),store},processData:function(results){var iterationStore=results[0],defectStore=results[1],thisApp=this;console.log("Iterations = ",iterationStore),console.log("Defect Data =",defectStore),thisApp.relevantDefects=Ext.Array.filter(defectStore,function(item){return console.log("Item= ",item),console.log("Created Date = ",item.get("CreatedDate")),console.log("Closed Date = ",item.get("ClosedDate")),!0},thisApp),console.log("Relevant Defects",thisApp.relevantDefects),console.log("Adding Grid Now"),this.addGrid(this.relevantDefects)},dateIn:function(ds,i){var d=new Date(Date.parse(ds)),b=new Date(Date.parse(i.get("StartDate"))),e=new Date(Date.parse(i.get("EndDate")));return d>=b&&d<=e},getFilters:function(){var myQueryString=this.getSetting("myQuery"),queryFilters=[];return myQueryString&&myQueryString.length>0&&(queryFilters=Rally.data.wsapi.Filter.fromQueryString(myQueryString)),queryFilters},addGrid:function(store){this.add({xtype:"rallygrid",store:store,columnCfgs:["FormattedID","Name","State","CreationDate","OpenedDate","ClosedDate"],showPagingToolbar:!1})},getIterationName:function(i){return i.get("Name").replace(/\./g,"_")},getSettingsFields:function(){return[{xtype:"textareafield",name:"myQuery",width:500,fieldLabel:"Query",labelAlign:"right",validateOnChange:!1,validateOnBlur:!1,validator:function(value){try{value&&value.length&&Rally.data.wsapi.Filter.fromQueryString(value)}catch(e){return Rally.ui.notify.Notifier.showError({message:e.message}),console.log("message",e.message),e.message}return!0}}]}});
+
+            Rally.launchApp('CustomApp', {
+                name:"EscapedDefects",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        
+    </style>
+</head>
+<body>
+</body>
+</html>
