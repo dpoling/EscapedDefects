@@ -34,18 +34,26 @@ Ext.define('CustomApp', {
         var store = Ext.create('Rally.data.wsapi.Store',{
             model: 'Iteration',
             fetch: ['Name', 'ObjectID', 'Project', 'StartDate', 'EndDate'],
-            filters: [],
+            context: {
+                projectScopeDown: false
+            },
+            sorters: [
+                {
+                    property: 'StartDate',
+                    direction: 'DESC'
+                }
+            ],
             pageSize: 2000,
-            limit: Infinity,
+            limit: 'Infinity'
         });
         store.load({
             callback: function(records, operation){
                 if (operation.wasSuccessful()){
                     thisApp.iterations = _.uniq(records, function (rec) { return thisApp.getIterationName(rec);});
-                    thisApp.iterations = _.sortBy( thisApp.iterations, function (i) {
-                       return new Date( Date.parse( i.get("EndDate"))) ;
-                    });
-                    thisApp.iterations = thisApp.iterations.reverse();
+//                    thisApp.iterations = _.sortBy( thisApp.iterations, function (i) {
+//                       return new Date( Date.parse( i.get("StartDate"))) ;
+//                    });
+//                    thisApp.iterations = thisApp.iterations.reverse();
                     deferred.resolve(records);
                 } else {
                     var errorMsg = "Faled to load Iterations" + operation.error && operation.error.errors.join(',br/>');
@@ -53,7 +61,7 @@ Ext.define('CustomApp', {
                 }
             }
         });
-        return store;
+        return deferred;
     },
     fetchDefects: function(model){
         var deferred = Ext.create('Deft.Deferred');
@@ -77,46 +85,55 @@ Ext.define('CustomApp', {
             }
         });
 
-        return store;
+        return deferred;
     },
     processData: function(results){
         var iterationStore = results[0];
         var defectStore = results[1];
         var thisApp = this;
         
-        console.log('Iterations = ', iterationStore);
-        console.log('Defect Data =', defectStore);
+//        console.log('Iteration Store = ', iterationStore);
+//        console.log('Defect Store =', defectStore);
         
         // construct an array of objects from the defectstore
         // that are not closed in the same iteration they were
         // created in.
         thisApp.relevantDefects = Ext.Array.filter(defectStore, function(item){
-            console.log("Item= ", item);
-            console.log("Created Date = ", item.get('CreatedDate'));
-            console.log("Closed Date = ", item.get('ClosedDate'));
-//           var iCreated = _.find(iterationStore, function(i){
-//               thisApp.dateIn(item.get('CreatedDate'),i);
-//           });
-//           var iClosed = _.find(iterationStore, function(i){
-//               thisApp.dateIn(item.get('ClosedDate'),i);
-//           });
-//           console.log("iCreated", iCreated);
-//           console.log("iClosed", iClosed);
+           var creation = item.get('CreationDate');
+           var closed = item.get('ClosedDate');
+           console.log('DefectID= ', item.get('FormattedID'));
+           var iCreated = _.find(iterationStore, function(i){
+               thisApp.dateIn(creation,i);
+           });
+           var iClosed = _.find(iterationStore, function(i){
+               thisApp.dateIn(closed,i);
+           });
+           console.log("iCreated=", iCreated);
+           console.log("iClosed=", iClosed);
+           
            return true;
         },thisApp);
         
         console.log("Relevant Defects", thisApp.relevantDefects);
         
+        this.customStore = Ext.create('Rally.data.custom.Store',{
+            data: this.relevantDefects
+        });
         
         console.log("Adding Grid Now");
-        this.addGrid(this.relevantDefects);
+        this.addGrid(this.customStore);
     },
     // returns true if the passed date string is in the iteration date range    
     dateIn : function ( ds, i ) {
         var d = new Date( Date.parse(ds));
         var b = new Date( Date.parse(i.get("StartDate")));
         var e = new Date( Date.parse(i.get("EndDate")));
-        return (( d >= b) && ( d <= e ));
+        var nm = i.get('Name');
+        var rslt = ((d >= b) && (d <= e));
+        if (rslt) {
+            console.log('date, Name, Start, End: ', ds, nm, b, e);
+        };
+        return rslt;
     },
     getFilters: function(){
 
@@ -136,12 +153,12 @@ Ext.define('CustomApp', {
             xtype: 'rallygrid',
             store: store,
             columnCfgs: [
-                'FormattedID',
-                'Name',
-                'State',
-                'CreationDate',
-                'OpenedDate',
-                'ClosedDate'
+                {dataIndex: 'FormattedID', text: 'Formatted ID'},
+                {dataIndex: 'Name', text: 'Name', flex:1},
+                {dataIndex: 'State', text: 'State', flex:1},
+                {dataIndex: 'CreationDate', text: 'Creation Date', flex:1},
+                {dataIndex: 'OpenedDate', text: 'Opened Date', flex:1},
+                {dataIndex: 'ClosedDate', text: 'Closed Date', flex:1}
             ],
             showPagingToolbar: false
         });
